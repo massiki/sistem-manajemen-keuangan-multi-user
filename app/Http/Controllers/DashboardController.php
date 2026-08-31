@@ -2,16 +2,30 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $user = Auth::user();
 
-        $summary = $user->transactions()
+        $selectedAccountId = $request->query('account_id');
+        if ($selectedAccountId !== null) {
+            $valid = $user->accounts()->where('id', $selectedAccountId)->exists();
+            if (! $valid) {
+                $selectedAccountId = null;
+            }
+        }
+
+        $baseQuery = $user->transactions();
+        if ($selectedAccountId !== null) {
+            $baseQuery->where('account_id', $selectedAccountId);
+        }
+
+        $summary = (clone $baseQuery)
             ->selectRaw("
                 COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
                 COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense,
@@ -21,7 +35,12 @@ class DashboardController extends Controller
 
         $totalIncome = (float) $summary->income;
         $totalExpense = (float) $summary->expense;
-        $initialBalance = (float) $user->accounts()->sum('initial_balance');
+
+        if ($selectedAccountId !== null) {
+            $initialBalance = (float) $user->accounts()->where('id', $selectedAccountId)->sum('initial_balance');
+        } else {
+            $initialBalance = (float) $user->accounts()->sum('initial_balance');
+        }
 
         $accountTotals = $user->transactions()
             ->selectRaw("
@@ -49,22 +68,28 @@ class DashboardController extends Controller
                 return $account;
             });
 
-        $recentTransactions = $user->transactions()
+        $recentTransactionsQuery = $user->transactions()
             ->with(['account', 'category'])
             ->latest('transaction_date')
             ->latest('id')
-            ->limit(5)
-            ->get();
+            ->limit(5);
+        if ($selectedAccountId !== null) {
+            $recentTransactionsQuery->where('account_id', $selectedAccountId);
+        }
+        $recentTransactions = $recentTransactionsQuery->get();
 
-        $dailyRows = $user->transactions()
+        $dailyRowsQuery = $user->transactions()
             ->selectRaw("
                 transaction_date,
                 COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) as income,
                 COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) as expense
             ")
             ->where('transaction_date', '>=', now()->subDays(6)->toDateString())
-            ->groupBy('transaction_date')
-            ->get()
+            ->groupBy('transaction_date');
+        if ($selectedAccountId !== null) {
+            $dailyRowsQuery->where('account_id', $selectedAccountId);
+        }
+        $dailyRows = $dailyRowsQuery->get()
             ->keyBy(fn ($row) => $row->transaction_date->toDateString());
 
         $daily = collect(range(6, 0))->map(function ($daysAgo) use ($dailyRows) {
@@ -79,6 +104,17 @@ class DashboardController extends Controller
             ];
         });
 
+        $expenseByCategoryQuery = $user->transactions()
+            ->join('categories', 'transactions.category_id', '=', 'categories.id')
+            ->where('transactions.type', 'expense')
+            ->selectRaw('categories.name, SUM(transactions.amount) as total')
+            ->groupBy('categories.name')
+            ->orderByDesc('total');
+        if ($selectedAccountId !== null) {
+            $expenseByCategoryQuery->where('transactions.account_id', $selectedAccountId);
+        }
+        $expenseByCategory = $expenseByCategoryQuery->get();
+
         return view('dashboard', [
             'balance' => $initialBalance + $totalIncome - $totalExpense,
             'totalIncome' => $totalIncome,
@@ -88,6 +124,8 @@ class DashboardController extends Controller
             'recentTransactions' => $recentTransactions,
             'daily' => $daily,
             'chartMax' => max($daily->max('income'), $daily->max('expense')) ?: 1,
+            'expenseByCategory' => $expenseByCategory,
+            'selectedAccountId' => $selectedAccountId,
         ]);
     }
 }
