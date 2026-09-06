@@ -123,43 +123,86 @@
         </div>
       </section>
 
-      {{-- Account filter --}}
-      @if ($accounts->isNotEmpty())
-        <div class="flex items-center gap-3">
-          <label for="accountFilter" class="text-sm font-medium text-gray-700 shrink-0">Filter berdasarkan kas:</label>
-          <select id="accountFilter"
-            class="max-w-xs rounded-xl border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500"
-            onchange="window.location.href = this.value ? '?account_id=' + this.value : '?'">
-            <option value="">Semua Kas</option>
-            @foreach ($accounts as $account)
-              <option value="{{ $account->id }}" {{ $selectedAccountId == $account->id ? 'selected' : '' }}>
-                {{ $account->name }}
-              </option>
-            @endforeach
-          </select>
+      {{-- Filter bar --}}
+      <form method="GET" action="{{ route('dashboard') }}"
+        class="flex flex-col sm:flex-row sm:items-end gap-3 p-4 bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5">
+        @if ($accounts->isNotEmpty())
+          <div class="flex flex-col gap-1">
+            <label for="accountFilter" class="text-xs font-medium text-gray-500">Kas / Akun</label>
+            <select id="accountFilter" name="account_id"
+              class="h-11 rounded-xl border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+              <option value="">Semua Kas</option>
+              @foreach ($accounts as $account)
+                <option value="{{ $account->id }}" {{ $selectedAccountId == $account->id ? 'selected' : '' }}>
+                  {{ $account->name }}
+                </option>
+              @endforeach
+            </select>
+          </div>
+        @endif
+
+        <div class="flex flex-col gap-1">
+          <label for="filterFrom" class="text-xs font-medium text-gray-500">Dari Tanggal</label>
+          <input type="date" id="filterFrom" name="from" value="{{ $from }}"
+            class="h-11 rounded-xl border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
         </div>
-      @endif
+
+        <div class="flex flex-col gap-1">
+          <label for="filterTo" class="text-xs font-medium text-gray-500">Sampai Tanggal</label>
+          <input type="date" id="filterTo" name="to" value="{{ $to }}"
+            class="h-11 rounded-xl border-gray-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500" />
+        </div>
+
+        <button type="submit"
+          class="h-11 px-6 bg-emerald-600 border border-transparent rounded-xl font-semibold text-sm text-white shadow-sm hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition">
+          Terapkan Filter
+        </button>
+
+        @if ($selectedAccountId || $from || $to)
+          <a href="{{ route('dashboard') }}"
+            class="h-11 px-6 flex items-center justify-center bg-white border border-gray-300 rounded-xl font-semibold text-sm text-gray-700 shadow-sm hover:bg-gray-50 transition">
+            Bersihkan
+          </a>
+        @endif
+      </form>
 
       {{-- Charts 2x2 grid --}}
       <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 
-        {{-- Line Chart: Tren 7 Hari --}}
+        {{-- Pie Chart: Komposisi Pemasukan --}}
         <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5">
-          <div class="px-6 pt-5 pb-4 flex flex-wrap items-center justify-between gap-3">
-            <h4 class="font-semibold text-gray-900">Tren 7 Hari</h4>
-            <div class="flex items-center gap-4 text-sm text-gray-500">
-              <span class="flex items-center gap-1.5">
-                <span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden="true"></span>
-                Masuk
-              </span>
-              <span class="flex items-center gap-1.5">
-                <span class="h-2.5 w-2.5 rounded-sm bg-rose-500" aria-hidden="true"></span>
-                Keluar
-              </span>
-            </div>
+          <div class="px-6 pt-5 pb-4">
+            <h4 class="font-semibold text-gray-900">Komposisi Pemasukan</h4>
+            @if ($from || $to)
+              <p class="mt-0.5 text-xs text-gray-400">
+                {{ $from ? \Carbon\Carbon::parse($from)->locale('id')->isoFormat('D MMM YYYY') : 'Awal' }}
+                &mdash;
+                {{ $to ? \Carbon\Carbon::parse($to)->locale('id')->isoFormat('D MMM YYYY') : 'Sekarang' }}
+              </p>
+            @endif
           </div>
-          <div class="px-6 pb-6">
-            <canvas id="trendChart" height="220"></canvas>
+          <div class="px-6 pb-6 flex items-center justify-center">
+            @if ($incomeByCategory->isEmpty())
+              <div class="py-10 text-center">
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+                  <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                  </svg>
+                </div>
+                <p class="mt-4 text-sm text-gray-500">Belum ada data pemasukan.</p>
+              </div>
+            @else
+              <div class="relative w-full max-w-[260px]">
+                <canvas id="incomePie"></canvas>
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div class="text-center">
+                    <p class="text-xs text-gray-400">Total</p>
+                    <p class="text-sm font-bold text-gray-900 tabular-nums" id="incomePieTotal"></p>
+                  </div>
+                </div>
+              </div>
+            @endif
           </div>
         </div>
 
@@ -167,6 +210,13 @@
         <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5">
           <div class="px-6 pt-5 pb-4">
             <h4 class="font-semibold text-gray-900">Komposisi Pengeluaran</h4>
+            @if ($from || $to)
+              <p class="mt-0.5 text-xs text-gray-400">
+                {{ $from ? \Carbon\Carbon::parse($from)->locale('id')->isoFormat('D MMM YYYY') : 'Awal' }}
+                &mdash;
+                {{ $to ? \Carbon\Carbon::parse($to)->locale('id')->isoFormat('D MMM YYYY') : 'Sekarang' }}
+              </p>
+            @endif
           </div>
           <div class="px-6 pb-6 flex items-center justify-center">
             <div class="relative w-full max-w-[260px]">
@@ -181,10 +231,19 @@
           </div>
         </div>
 
-        {{-- Bar Chart: Perbandingan Income vs Expense --}}
+        {{-- Line Chart: Perbandingan Income vs Expense --}}
         <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5">
           <div class="px-6 pt-5 pb-4 flex flex-wrap items-center justify-between gap-3">
-            <h4 class="font-semibold text-gray-900">Perbandingan Income vs Expense</h4>
+            <div>
+              <h4 class="font-semibold text-gray-900">Perbandingan Income vs Expense</h4>
+              @if ($from || $to)
+                <p class="mt-0.5 text-xs text-gray-400">
+                  {{ $from ? \Carbon\Carbon::parse($from)->locale('id')->isoFormat('D MMM YYYY') : 'Awal' }}
+                  &mdash;
+                  {{ $to ? \Carbon\Carbon::parse($to)->locale('id')->isoFormat('D MMM YYYY') : 'Sekarang' }}
+                </p>
+              @endif
+            </div>
             <div class="flex items-center gap-4 text-sm text-gray-500">
               <span class="flex items-center gap-1.5">
                 <span class="h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden="true"></span>
@@ -205,6 +264,13 @@
         <div class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-900/5">
           <div class="px-6 pt-5 pb-4">
             <h4 class="font-semibold text-gray-900">Top Kategori Pengeluaran</h4>
+            @if ($from || $to)
+              <p class="mt-0.5 text-xs text-gray-400">
+                {{ $from ? \Carbon\Carbon::parse($from)->locale('id')->isoFormat('D MMM YYYY') : 'Awal' }}
+                &mdash;
+                {{ $to ? \Carbon\Carbon::parse($to)->locale('id')->isoFormat('D MMM YYYY') : 'Sekarang' }}
+              </p>
+            @endif
           </div>
           <div class="px-6 pb-6">
             @if ($expenseByCategory->isEmpty())
@@ -383,66 +449,63 @@
         return 'Rp ' + new Intl.NumberFormat('id-ID').format(val);
       }
 
-      // --- LINE CHART: Tren 7 Hari ---
-      const trendData = @json($daily);
-      new Chart(document.getElementById('trendChart'), {
-        type: 'line',
-        data: {
-          labels: trendData.map(d => d.label),
-          datasets: [
-            {
-              label: 'Uang Masuk',
-              data: trendData.map(d => d.income),
-              borderColor: EMERALD,
-              backgroundColor: EMERALD_20,
-              fill: true,
-              tension: 0.4,
-              borderWidth: 2.5,
-              pointRadius: 4,
-              pointBackgroundColor: EMERALD,
-              pointBorderColor: '#fff',
-              pointBorderWidth: 2,
-              pointHoverRadius: 6,
-            },
-            {
-              label: 'Uang Keluar',
-              data: trendData.map(d => d.expense),
-              borderColor: ROSE,
-              backgroundColor: ROSE_20,
-              fill: true,
-              tension: 0.4,
-              borderWidth: 2.5,
-              pointRadius: 4,
-              pointBackgroundColor: ROSE,
-              pointBorderColor: '#fff',
-              pointBorderWidth: 2,
-              pointHoverRadius: 6,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { intersect: false, mode: 'index' },
-          scales: {
-            x: { ...commonScaleOptions, grid: { display: false } },
-            y: {
-              ...commonScaleOptions,
-              beginAtZero: true,
-              ticks: { ...commonScaleOptions.ticks, callback: (v) => formatRupiah(v) },
-            },
+      // --- PIE CHART: Komposisi Pemasukan ---
+      const incomeData = @json($incomeByCategory);
+      const incomePieColors = incomeData.map((_, i) => {
+        const t = i / Math.max(incomeData.length - 1, 1);
+        const r = Math.round(16 + (244 - 16) * t);
+        const g = Math.round(185 + (63 - 185) * t);
+        const b = Math.round(129 + (94 - 129) * t);
+        return `rgb(${r}, ${g}, ${b})`;
+      });
+
+      const totalIncome = incomeData.reduce((s, c) => s + Number(c.total), 0);
+      const incomePieTotalEl = document.getElementById('incomePieTotal');
+      if (incomePieTotalEl) {
+        incomePieTotalEl.textContent = formatRupiah(totalIncome);
+      }
+
+      if (incomeData.length > 0) {
+        new Chart(document.getElementById('incomePie'), {
+          type: 'pie',
+          data: {
+            labels: incomeData.map(c => c.name),
+            datasets: [{
+              data: incomeData.map(c => Number(c.total)),
+              backgroundColor: incomePieColors,
+              borderColor: '#fff',
+              borderWidth: 3,
+              hoverOffset: 8,
+            }],
           },
-          plugins: {
-            ...commonPluginOptions,
-            tooltip: {
-              ...commonPluginOptions.tooltip,
-              callbacks: {
-                label: (ctx) => ` ${ctx.dataset.label}: ${formatRupiah(ctx.parsed.y)}`,
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'bottom',
+                labels: {
+                  color: GRAY_500,
+                  font: { ...FONT, size: 11 },
+                  padding: 12,
+                  usePointStyle: true,
+                  pointStyleWidth: 8,
+                },
+              },
+              tooltip: {
+                ...commonPluginOptions.tooltip,
+                callbacks: {
+                  label: (ctx) => {
+                    const pct = ((ctx.parsed / totalIncome) * 100).toFixed(1);
+                    return ` ${ctx.label}: ${formatRupiah(ctx.parsed)} (${pct}%)`;
+                  },
+                },
               },
             },
           },
-        },
-      });
+        });
+      }
 
       // --- DOUGHNUT CHART: Komposisi Pengeluaran ---
       const categoryData = @json($expenseByCategory);
@@ -503,27 +566,40 @@
         });
       }
 
-      // --- BAR CHART: Perbandingan Income vs Expense ---
+      // --- LINE CHART: Perbandingan Income vs Expense ---
+      const trendData = @json($daily);
       new Chart(document.getElementById('comparisonChart'), {
-        type: 'bar',
+        type: 'line',
         data: {
           labels: trendData.map(d => d.label),
           datasets: [
             {
               label: 'Uang Masuk',
               data: trendData.map(d => d.income),
-              backgroundColor: EMERALD,
-              borderRadius: 6,
-              borderSkipped: false,
-              maxBarThickness: 24,
+              borderColor: EMERALD,
+              backgroundColor: EMERALD_20,
+              fill: true,
+              tension: 0.4,
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: EMERALD,
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              pointHoverRadius: 6,
             },
             {
               label: 'Uang Keluar',
               data: trendData.map(d => d.expense),
-              backgroundColor: ROSE,
-              borderRadius: 6,
-              borderSkipped: false,
-              maxBarThickness: 24,
+              borderColor: ROSE,
+              backgroundColor: ROSE_20,
+              fill: true,
+              tension: 0.4,
+              borderWidth: 2.5,
+              pointRadius: 4,
+              pointBackgroundColor: ROSE,
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              pointHoverRadius: 6,
             },
           ],
         },
